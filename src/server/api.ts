@@ -52,7 +52,7 @@ app.post('/api/render', async (req, res) => {
   }
 
   const tmpDir = os.tmpdir();
-  const id = Date.now();
+  const id = crypto.randomUUID();
   const audioPath = path.join(tmpDir, `speech-${id}.mp3`);
   const videoPath = path.join(tmpDir, `speech-${id}.mp4`);
 

@@ -4,6 +4,10 @@
 
 import 'dotenv/config';
 import fs from 'fs/promises';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
 
 export async function synthesizeSpeech(
   text: string,
@@ -41,8 +45,21 @@ export async function synthesizeSpeech(
   const buffer = Buffer.from(await res.arrayBuffer());
   await fs.writeFile(outputPath, buffer);
 
-  // 128kbps MP3 기준 duration 추정
-  const durationSec = buffer.byteLength / (128000 / 8);
+  // ffprobe로 실제 오디오 길이 측정 (128kbps 추정 대신 정확한 값 사용)
+  let durationSec: number;
+  try {
+    const { stdout } = await execFileAsync('ffprobe', [
+      '-v', 'error',
+      '-show_entries', 'format=duration',
+      '-of', 'default=noprint_wrappers=1:nokey=1',
+      outputPath,
+    ]);
+    durationSec = parseFloat(stdout.trim());
+    if (!isFinite(durationSec) || durationSec <= 0) throw new Error('invalid duration');
+  } catch {
+    // ffprobe 실패 시 128kbps 추정으로 폴백
+    durationSec = buffer.byteLength / (128000 / 8);
+  }
 
   return { durationSec };
 }

@@ -6,12 +6,15 @@ import {
   LIP_LOWER_PATHS,
   LIP_OPENNESS,
 } from './lipShapes.js';
+import { morphPath } from './morphPath.js';
 
 interface LipShapeProps {
   model: LipModel;
   weight: number;
   blendModel?: LipModel;
   blendWeight?: number;
+  morphTarget?: LipModel;
+  morphT?: number;
   cx?: number;
   cy?: number;
 }
@@ -31,12 +34,20 @@ export const LipShape: React.FC<LipShapeProps> = ({
   weight,
   blendModel,
   blendWeight = 0,
+  morphTarget,
+  morphT = 0,
   cx = 0,
   cy = 0,
 }) => {
   const openness = LIP_OPENNESS[model] * weight;
-  const upperPath = LIP_UPPER_PATHS[model];
-  const lowerPath = LIP_LOWER_PATHS[model];
+  const baseUpperPath = LIP_UPPER_PATHS[model];
+  const baseLowerPath = LIP_LOWER_PATHS[model];
+  const upperPath = morphTarget
+    ? morphPath(baseUpperPath, LIP_UPPER_PATHS[morphTarget], morphT)
+    : baseUpperPath;
+  const lowerPath = morphTarget
+    ? morphPath(baseLowerPath, LIP_LOWER_PATHS[morphTarget], morphT)
+    : baseLowerPath;
   // 원순 모음 (ㅗ,ㅜ,w계열) — 더 짙고 어두운 그라데이션
   const isRounded = (model === 'L4' || model === 'L5' || model === 'L9');
 

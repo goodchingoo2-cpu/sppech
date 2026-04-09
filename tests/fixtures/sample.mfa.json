@@ -1,0 +1,13 @@
+{
+  "words": [
+    { "word": "아버지", "start": 0.0, "end": 0.85 }
+  ],
+  "phones": [
+    { "label": "ㅇ", "start": 0.0,  "end": 0.12 },
+    { "label": "ㅏ", "start": 0.12, "end": 0.25 },
+    { "label": "ㅂ", "start": 0.25, "end": 0.40 },
+    { "label": "ㅓ", "start": 0.40, "end": 0.55 },
+    { "label": "ㅈ", "start": 0.55, "end": 0.68 },
+    { "label": "ㅣ", "start": 0.68, "end": 0.85 }
+  ]
+}

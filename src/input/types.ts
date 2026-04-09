@@ -78,6 +78,10 @@ export interface RemotionFrameData {
   blendModel?: LipModel;
   /** 블렌딩 가중치 */
   blendWeight?: number;
+  /** Path 모핑 대상 모델 (모델 전환 구간에서 사용) */
+  morphTarget?: LipModel;
+  /** Path 모핑 진행도 0~1 */
+  morphT?: number;
 }
 
 /** MFA TextGrid 파싱 결과 (단어 단위) */

@@ -31,6 +31,8 @@ export function AnimationCanvas({ frame, size = 360 }: Props) {
   const tongueWeight = frame?.tongueWeight ?? 0;
   const blendModel  = frame?.blendModel;
   const blendWeight = frame?.blendWeight ?? 0;
+  const morphTarget = frame?.morphTarget;
+  const morphT      = frame?.morphT ?? 0;
 
   // 구강 클리핑 타원 — openness에 따라 ry 동적 조정
   const openness = LIP_OPENNESS[lipModel] * lipWeight;
@@ -88,6 +90,8 @@ export function AnimationCanvas({ frame, size = 360 }: Props) {
           weight={lipWeight}
           blendModel={blendModel}
           blendWeight={blendWeight}
+          morphTarget={morphTarget}
+          morphT={morphT}
           cx={0}
           cy={0}
         />

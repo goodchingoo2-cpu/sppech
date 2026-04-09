@@ -54,14 +54,16 @@ export function useSpeechAnimation(): UseSpeechAnimationReturn {
     const cur  = frames[frameIdx];
     const next = frames[nextIdx];
 
-    // weight만 선형 보간 (blendModel 미사용 — 두 형태 동시 렌더링 시 중복 이미지 발생)
-    // lipModel 전환은 1프레임(1/30초) 내 순간 전환으로 처리 (시각적으로 무방)
+    // weight 선형 보간 + 모델 전환 시 morphTarget/morphT로 부드러운 path 보간
+    const modelChanging = cur.lipModel !== next.lipModel;
     const interpolated: RemotionFrameData = {
       ...cur,
       lipWeight:    cur.lipWeight    * (1 - t) + next.lipWeight    * t,
       tongueWeight: cur.tongueWeight * (1 - t) + next.tongueWeight * t,
       blendModel:   undefined,
       blendWeight:  undefined,
+      morphTarget:  modelChanging ? next.lipModel : undefined,
+      morphT:       modelChanging ? t : undefined,
     };
 
     setCurrentFrame(interpolated);

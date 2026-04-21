@@ -1,19 +1,20 @@
-﻿/**
- * Ollama 湲곕컲 LLM ?쒕퉬??(?ㅽ겕由쏀듃 湲곕컲 而ㅻ━?섎읆 ?꾩슜).
+/**
+ * LM Studio 기반 LLM 서비스 (OpenAI 호환 엔드포인트 사용).
  *
- * ?댁쟾 踰꾩쟾: ?먯쑉 ?쒗꽣 ??LLM???꾩껜 ?섏뾽 ?ㅽ겕由쏀듃瑜?JSON?쇰줈 ?앹꽦.
- *            gemma4:e4b(?묒? 紐⑤뜽)媛 湲?JSON??留뚮뱾??吏???ㅽ뙣?섎뒗 臾몄젣濡??먭린.
+ * 이전 버전: 로컬 스크립트 형태의 LLM에 직접 스크립트를 JSON으로 생성.
+ *            gemma4:e4b(구형 모델)가 순수 JSON을 반환하지 못하는 문제로 교체.
  *
- * ?꾩옱 踰꾩쟾: ?깆씠 ?ㅽ겕由쏀듃(curriculum/book1.ts)瑜??뚮━怨?LLM? ??媛吏留??쒕떎.
- *   1) evaluate(): ?숈뒿??諛쒖쓬/?묐떟???덉긽 ?듬?怨?留욌뒗吏 吏㏐쾶 ?먯젙
- *   2) answer():   ?숈뒿?먯쓽 ?먯쑀 吏덈Ц??援ъ뼱泥??쒓뎅?대줈 吏㏐쾶 ?듬?
+ * 현재 버전: 이 스크립트(curriculum/book1.ts)를 입력받아 LLM이 두 가지 역할을 맡는다.
+ *   1) evaluate(): 학습자의 발화/답변이 정상 맞는지 LLM으로 판정
+ *   2) answer():   학습자의 질문에 튜터 언어로 LLM으로 답변
  *
- * ?????낅젰??吏㏐퀬 異쒕젰??吏㏃븘 E4B 紐⑤뜽濡쒕룄 異⑸텇??鍮좊Ⅴ??
- * AbortController濡?10珥???꾩븘?껋쓣 嫄멸퀬, ?ㅽ뙣 ???덉쟾??湲곕낯媛믪쑝濡??대갚?쒕떎.
+ * 답변 속도를 고려하고 비교적 가벼운 E2B 모델로도 충분하게 설계.
+ * AbortController로 10초 타임아웃을 걸고, 실패 시 안전한 기본값으로 대체한다.
  *
- * 援ъ꽦 ?붽굔:
- *  - Ollama 濡쒖뺄 ?ㅽ뻾: `ollama serve`
- *  - 紐⑤뜽: 湲곕낯 gemma4:e4b ??`.env.local`??VITE_OLLAMA_MODEL濡???뼱?곌린 媛?? *  - Vite dev ?쒕쾭媛 `/ollama` ??`http://localhost:11434` ?꾨줉??(vite.config.ts)
+ * 실행 조건:
+ *  - LM Studio 실행: Developer 탭 → Local Server 켜기 (기본 포트 1234)
+ *  - 모델: 기본 gemma4:e2b 또는 `.env.local`의 VITE_LM_STUDIO_MODEL로 지정
+ *  - Vite dev 프록시가 `/lmstudio` → `http://localhost:1234` 포워딩(vite.config.ts)
  */
 
 import { EVAL_SYSTEM_PROMPT, ANSWER_SYSTEM_PROMPT } from './systemPrompt.js';
@@ -23,11 +24,11 @@ export interface ChatMessage {
   readonly content: string;
 }
 
-/** ?숈뒿???묐떟 ?먯젙 寃곌낵. */
+/** 학습자 답변 평가 결과. */
 export type EvalVerdict = 'match' | 'close' | 'different' | 'question';
 export interface EvalResult {
   readonly verdict: EvalVerdict;
-  /** ?쒗꽣媛 ?숈뒿?먯뿉寃?留먰빐以??쒕몢 臾몄옣 ?쇰뱶諛? */
+  /** 튜터가 학습자에게 건네는 짧은 피드백 문장. */
   readonly feedback: string;
 }
 
@@ -49,7 +50,7 @@ interface LmStudioChatResponse {
   readonly error?: string | { readonly message?: string };
 }
 
-/** 肄붾뱶釉붾줉/?≪쓬 ?쒓굅 ??泥?JSON 媛앹껜 ?뚯떛. */
+/** 마크다운/코드블록 래퍼 제거 후 순수 JSON 객체 파싱. */
 function extractJson(content: string): unknown {
   const trimmed = content.trim();
   const m = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -60,7 +61,7 @@ function extractJson(content: string): unknown {
   return JSON.parse(jsonStr);
 }
 
-/** ?몃? AbortSignal + ?대? ??꾩븘?껋쓣 寃고빀??AbortController ?앹꽦. */
+/** 외부 AbortSignal + 내부 타임아웃을 결합한 AbortController 생성. */
 function withTimeout(external?: AbortSignal): { signal: AbortSignal; cancel: () => void } {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(new Error('LLM timeout')), TIMEOUT_MS);
@@ -90,7 +91,7 @@ async function rawChat(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal,
-            body: JSON.stringify({
+      body: JSON.stringify({
         model: MODEL,
         messages: useJsonFormat
           ? [
@@ -109,7 +110,7 @@ async function rawChat(
       throw new Error(`LM Studio HTTP ${res.status}: ${body.slice(0, 200)}`);
     }
 
-        const data = (await res.json()) as LmStudioChatResponse;
+    const data = (await res.json()) as LmStudioChatResponse;
     if (data.error) {
       const message = typeof data.error === 'string' ? data.error : data.error.message;
       throw new Error(`LM Studio error: ${message || 'unknown error'}`);
@@ -126,12 +127,12 @@ export const llmService = {
   model: MODEL,
 
   /**
-   * ?숈뒿?먯쓽 諛쒗솕(transcript)媛 湲곕? ?듬?(expected) 以??섎굹? 留욌뒗吏 ?먯젙.
+   * 학습자의 발화(transcript)가 기준 답변(expected) 중 하나와 맞는지 판정.
    *
-   * - expected??洹???ぉ?먯꽌 ?뺣떟?쇰줈 ?몄젙??蹂?뺣뱾(?? ['??, '??, 'a']).
-   * - 鍮좊Ⅸ 留ㅼ묶: ?뺢퇋?붾맂 臾몄옄?댁씠 ?섎굹?쇰룄 媛숈쑝硫?利됱떆 match 諛섑솚 (LLM ?몄텧 X).
-   * - 洹??몄뿉??LLM??吏㏃? JSON ?먯젙???붿껌.
-   * - LLM ?ㅽ뙣/??꾩븘???? ?덉쟾???대갚(吏덈Ц泥섎읆 蹂댁씠硫?question, ?꾨땲硫?close).
+   * - expected의 각 항목에서 공백/구두점을 제거한 뒤 정규화해 비교.
+   * - 빠른 경로: 정규화된 글자가 일치하면 LLM 호출 없이 즉시 match 반환.
+   * - 그 밖에는 LLM에 JSON 판정을 요청.
+   * - LLM 실패/타임아웃 시 안전한 기본값(질문이면 question, 아니면 close).
    */
   async evaluate(
     expected: readonly string[],
@@ -139,18 +140,18 @@ export const llmService = {
     context: string,
     signal?: AbortSignal,
   ): Promise<EvalResult> {
-    const norm = (s: string) => s.replace(/[\s.!?,。！？'"“”‘’~…]/g, '').toLowerCase();
+    const norm = (s: string) => s.replace(/[\s.!?,。！？'"""''~…]/g, '').toLowerCase();
     const actual = norm(transcript);
     if (!actual) {
-      return { verdict: 'close', feedback: '?????ㅻ졇?댁슂. ?ㅼ떆 ??踰?留먰빐二쇱꽭??' };
+      return { verdict: 'close', feedback: '목소리가 작게 들렸어요. 다시 한번 말해봐요.' };
     }
     for (const ex of expected) {
       if (norm(ex) === actual) {
-        return { verdict: 'match', feedback: '?섑븯?⑥뼱??' };
+        return { verdict: 'match', feedback: '잘 하셨어요!' };
       }
     }
 
-    // 吏덈Ц?쇰줈 ?섏떖?섎뒗 ?⑦꽩
+    // 질문처럼 들리는 패턴
     const looksLikeQuestion =
       /\?|까요|나요|무엇|뭐|어떻게|어디|언제|누구|설명|알려/.test(transcript);
 
@@ -188,11 +189,11 @@ export const llmService = {
   },
 
   /**
-   * ?숈뒿?먯쓽 ?먯쑀 吏덈Ц??吏㏃? 援ъ뼱泥??쒓뎅???듬? ?앹꽦.
-   * context: 吏湲??대뼡 ?⑥썝/??ぉ??諛곗슦??以묒씤吏 ??以??ㅻ챸.
+   * 학습자의 질문에 대해 튜터 언어로 답변을 생성.
+   * context: 지금 배우고 있는 레슨/단계의 내용을 알려준다.
    */
   async answer(context: string, question: string, signal?: AbortSignal): Promise<string> {
-    const userPayload = `[吏湲?諛곗슦??以? ${context}\n[?숈깮 吏덈Ц] ${question}`;
+    const userPayload = `[지금 배우는 내용] ${context}\n[학습자 질문] ${question}`;
     try {
       const raw = await rawChat(
         [
@@ -209,7 +210,7 @@ export const llmService = {
     }
   },
 
-  /** Ollama ?ъ뒪泥댄겕. */
+  /** LM Studio 서버 연결 확인 (ping). */
   async ping(): Promise<boolean> {
     try {
       const res = await fetch('/lmstudio/v1/models', { method: 'GET' });
@@ -221,20 +222,17 @@ export const llmService = {
 };
 
 const DEFAULT_ANSWER =
-  '醫뗭? 吏덈Ц?댁뿉?? 吏湲덉? ?먯꽭???ㅻ챸?섍린 ?대젮?뚯꽌, ?쇰떒 ?ㅼ쓬?쇰줈 ?섏뼱媛덇쾶??';
+  '죄송해요, 잘 이해하지 못했어요. 선생님께 다시 여쭤봐요.';
 
 function defaultFeedback(v: EvalVerdict): string {
   switch (v) {
     case 'match':
-      return '?섑븯?⑥뼱??';
+      return '잘 하셨어요!';
     case 'close':
-      return '鍮꾩듂?댁슂. ??踰덈쭔 ???대낵源뚯슂?';
+      return '거의 맞아요. 한번 더 따라해볼까요?';
     case 'different':
-      return '?ㅼ떆 ??踰???諛쒖쓬?????ㅼ뼱蹂댁꽭??';
+      return '다시 한번 천천히 따라 말해봐요.';
     case 'question':
-      return '醫뗭? 吏덈Ц?대꽕?? ?좉퉸 ?ㅻ챸???쒕┫寃뚯슂.';
+      return '좋은 질문이에요! 조금 더 설명할게요.';
   }
 }
-
-
-

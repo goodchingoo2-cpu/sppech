@@ -48,13 +48,17 @@ export interface EngineStatus {
 // 설정
 // ---------------------------------------------------------------------------
 
-/** Vite 미들웨어가 이 URL 로 GGUF 를 서빙한다. */
-const MODEL_URL = '/local-model/gemma-4-e2b.gguf';
+/**
+ * Vite 미들웨어가 서빙하는 GGUF URL.
+ * Web Worker 안에서는 상대 경로가 파싱되지 않으므로 절대 URL 필수.
+ * window.location.origin → e.g. http://127.0.0.1:5180
+ */
+const MODEL_URL = `${window.location.origin}/local-model/gemma-4-e2b.gguf`;
 
-/** wllama WASM 파일 경로 설정. */
+/** wllama WASM 파일도 절대 URL (Worker 내부 호환). */
 const WASM_PATHS = {
-  'single-thread/wllama.wasm': '/wllama/single-thread/wllama.wasm',
-  'multi-thread/wllama.wasm':  '/wllama/multi-thread/wllama.wasm',
+  'single-thread/wllama.wasm': `${window.location.origin}/wllama/single-thread/wllama.wasm`,
+  'multi-thread/wllama.wasm':  `${window.location.origin}/wllama/multi-thread/wllama.wasm`,
 };
 
 /** 추론 설정. */

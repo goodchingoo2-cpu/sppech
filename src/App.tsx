@@ -16,9 +16,11 @@ import { useAvatarConfig } from './avatar/avatarConfig.js';
 import { ttsService, pickVoiceByGender } from './tts/ttsService.js';
 import { TutorSlide } from './tutor/TutorSlide.js';
 import { TutorControls } from './tutor/TutorControls.js';
+import { LLMEngineStatus } from './tutor/LLMEngineStatus.js';
 import { useTutorSession, type TutorProgress } from './tutor/useTutorSession.js';
 import type { TutorTurn } from './tutor/types.js';
 import { CURRICULA } from './curriculum/book1.js';
+import { llmEngine } from './tutor/llmEngine.js';
 
 type Speed = 'slow' | 'normal' | 'fast';
 
@@ -109,6 +111,8 @@ export default function App() {
     } else {
       setShowCustomizer(false);
       setTutorMode(true);
+      // 튜터 모드 진입 시 내장 LLM 엔진 로드 시작 (이미 로딩/준비 중이면 무시됨)
+      void llmEngine.load();
     }
   }
 
@@ -175,6 +179,13 @@ export default function App() {
       {showCustomizer && (
         <div style={styles.customizerWrap}>
           <AvatarCustomizer />
+        </div>
+      )}
+
+      {/* 튜터 모드 — 엔진 로딩/오류 상태 표시 */}
+      {tutorMode && (
+        <div style={styles.engineStatusWrap}>
+          <LLMEngineStatus />
         </div>
       )}
 
@@ -379,6 +390,10 @@ const styles: Record<string, React.CSSProperties> = {
     flex: '1 1 55%',
     minWidth: 0,
     position: 'relative',
+  },
+  engineStatusWrap: {
+    padding: '0 12px 0 12px',
+    background: '#111827',
   },
   panel: {
     padding: 16,

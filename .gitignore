@@ -1,7 +1,8 @@
-node_modules/
-dist/
-dist-ui/
+node_modules
+dist
+.vite
 .env
-*.mp3
-*.mp4
-*.wav
+.env.local
+
+# 아바타 GLB는 저장소에 포함하지 않고 빌드 시 다운로드한다.
+assets/models/*.glb
